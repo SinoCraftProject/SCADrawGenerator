@@ -3,13 +3,13 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
-Console.WriteLine("SinoCalligraphy Drawing Generator Ver: 1.0.0.");
+Console.WriteLine("SinoCalligraphy Drawing Generator Ver: 1.1.0.");
 Console.WriteLine("Powered by qyl27 of SinoCraft Project Team.");
 Console.WriteLine("Only Windows is supported!");
 
-if (args.Length != 4)
+if (args.Length != 7)
 {
-    Console.WriteLine("Usage: <Source file path> <Horizontal frame count> <Vertical frame count> <Type>.");
+    Console.WriteLine("Usage: <Source file path> <Horizontal frame count> <Vertical frame count> <Author name> <Ink type> <Paper color> <Draw name>.");
     return;
 }
 
@@ -20,7 +20,7 @@ int.TryParse(args[2], out var vertical);
 
 var sum = horizontal * vertical;
 
-var frameSize = 32;
+const int frameSize = 32;
 
 if (image.Width != horizontal * frameSize
     || image.Height != vertical * frameSize)
@@ -35,17 +35,21 @@ for (var i = 0; i < horizontal; i++)
     {
         var stringBuilder = new StringBuilder();
 
-        stringBuilder.Append("{author: '");
-
-        var author = JsonConvert.SerializeObject(ChatComponent.Get(), new JsonSerializerSettings
+        var author = JsonConvert.SerializeObject(ChatComponent.WithAuthor(args[3]), new JsonSerializerSettings
         {
             NullValueHandling = NullValueHandling.Ignore, 
             ContractResolver = new CamelCasePropertyNamesContractResolver()
         });
-        // stringBuilder.Append(author.Replace("\"", "\\\""));
-        stringBuilder.Append(author);
+        stringBuilder.Append($"{{author:'{author}',");
+        
+        var title = JsonConvert.SerializeObject(ChatComponent.WithName(args[6], i, j), new JsonSerializerSettings
+        {
+            NullValueHandling = NullValueHandling.Ignore, 
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        });
+        stringBuilder.Append($"title:'{title}',");
 
-        stringBuilder.Append("',pixels:[B;");
+        stringBuilder.Append("pixels:[B;");
     
         for (var k = 0; k < frameSize; k++)
         {
@@ -69,10 +73,9 @@ for (var i = 0; i < horizontal; i++)
             }
         }
                          
-        stringBuilder.Append("]");
-        stringBuilder.Append(",type:\"");
-        stringBuilder.Append(args[3]);
-        stringBuilder.Append("\",version:\"BrushV3\"}");
+        stringBuilder.Append(']');
+        stringBuilder.Append($",ink:\"{args[4]}\",paper:{args[5]},");
+        stringBuilder.Append("version:\"1\"}");
 
         var path = new FileInfo(args[0]);
         File.WriteAllText($"{path.Directory}/{path.Name}-{i}-{j}.txt", stringBuilder.ToString());
@@ -87,10 +90,11 @@ public class ChatComponent
 
     public ChatComponent[] Extra { get; set; } = null;
 
-    public static ChatComponent Get()
+    public static ChatComponent WithAuthor(string name)
     {
         return new ChatComponent
         {
+            Text = name,
             Extra = new [] {
                 new ChatComponent
                 {
@@ -105,6 +109,22 @@ public class ChatComponent
                             Extra = null
                         }
                     }
+                }
+            }
+        };
+    }
+
+    public static ChatComponent WithName(string name, int x, int y)
+    {
+        return new ChatComponent
+        {
+            Text = name,
+            Extra = new []
+            {
+                new ChatComponent
+                {
+                    Text = $" [{x}, {y}]",
+                    Color = "gold"
                 }
             }
         };
