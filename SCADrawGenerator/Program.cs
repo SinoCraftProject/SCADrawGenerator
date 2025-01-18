@@ -1,132 +1,82 @@
 ﻿using System.Drawing;
-using System.Text;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
-Console.WriteLine("SinoCalligraphy Drawing Generator Ver: 1.1.0.");
+Console.WriteLine("SinoBrush Drawing Generator Ver: 1.2.0.");
 Console.WriteLine("Powered by qyl27 of SinoCraft Project Team.");
 Console.WriteLine("Only Windows is supported!");
 
-if (args.Length != 7)
+if (args.Length != 3)
 {
-    Console.WriteLine("Usage: <Source file path> <Horizontal frame count> <Vertical frame count> <Author name> <Ink type> <Paper color> <Draw name>.");
+    Console.WriteLine("Usage: <Source file path> <Width> <Height>.");
     return;
 }
 
-var image = (Bitmap) Image.FromFile(args[0]);
+var image = (Bitmap)Image.FromFile(args[0]);
 
-int.TryParse(args[1], out var horizontal);
-int.TryParse(args[2], out var vertical);
+int.TryParse(args[1], out var w);
+int.TryParse(args[2], out var h);
 
-var sum = horizontal * vertical;
-
-const int frameSize = 32;
-
-if (image.Width != horizontal * frameSize
-    || image.Height != vertical * frameSize)
+if (image.Width != w
+    || image.Height != h)
 {
-    Console.WriteLine("Image is illegal!");
+    Console.WriteLine("Image not fit!");
     return;
 }
 
-for (var i = 0; i < horizontal; i++)
+var draw = new Draw
 {
-    for (var j = 0; j < vertical; j++)
+    Size = new Draw.DrawSize
     {
-        var stringBuilder = new StringBuilder();
+        X = w,
+        Y = h
+    },
+    Date = 1,
+    Pixels = new int[w * h]
+};
 
-        var author = JsonConvert.SerializeObject(ChatComponent.WithAuthor(args[3]), new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore, 
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
-        });
-        stringBuilder.Append($"{{author:'{author}',");
-        
-        var title = JsonConvert.SerializeObject(ChatComponent.WithName(args[6], i, j), new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore, 
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
-        });
-        stringBuilder.Append($"title:'{title}',");
+for (var i = 0; i < w; i++)
+{
+    for (var j = 0; j < h; j++)
+    {
+        var color = image.GetPixel(i, j);
 
-        stringBuilder.Append("pixels:[B;");
-    
-        for (var k = 0; k < frameSize; k++)
-        {
-            for (var l = 0; l < frameSize; l++)
-            {
-                var color = image.GetPixel(k + frameSize * i, l + frameSize * j);
-
-                var alpha = int.Parse(color.A.ToString("D"));
-                var a = alpha / 16;
-                stringBuilder.Append(a + "B");
-            
-                if (l % 32 != 31)
-                {
-                    stringBuilder.Append(',');
-                }
-            }
-        
-            if (k % 32 != 31)
-            {
-                stringBuilder.Append(',');
-            }
-        }
-                         
-        stringBuilder.Append(']');
-        stringBuilder.Append($",ink:\"{args[4]}\",paper:{args[5]},");
-        stringBuilder.Append("version:\"1\"}");
-
-        var path = new FileInfo(args[0]);
-        File.WriteAllText($"{path.Directory}/{path.Name}-{i}-{j}.txt", stringBuilder.ToString());
+        var alpha = int.Parse(color.A.ToString("D"));
+        var a = alpha / 16;
+        var index = i * w + j;
+        draw.Pixels[index] = a;
     }
 }
 
-public class ChatComponent
+var f = new FileInfo(args[0]);
+
+var str = JsonSerializer.Serialize(draw, new JsonSerializerOptions
 {
-    public string Text { get; set; } = "Infinity_rain";
-    public string Color { get; set; } = "aqua";
-    public string Bold { get; set; } = "false";
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+});
+File.WriteAllText($"{f.Directory}/{f.Name}.txt", str);
+Console.WriteLine("Done!");
 
-    public ChatComponent[] Extra { get; set; } = null;
+public class Draw
+{
+    public long Date { get; set; }
+    public int[] Pixels { get; set; }
+    public DrawSize Size { get; set; }
+    public DrawColor Color { get; set; } = new();
+    public string Author { get; set; } = "{\"translate\":\"sinobrush.drawing.author.unknown\"}";
+    public string Title { get; set; } = "{\"translate\":\"sinobrush.drawing.title.unknown\"}";
+    public int Version { get; set; } = 1;
 
-    public static ChatComponent WithAuthor(string name)
+    public class DrawSize
     {
-        return new ChatComponent
-        {
-            Text = name,
-            Extra = new [] {
-                new ChatComponent
-                {
-                    Text = " with ",
-                    Color = "grey",
-                    Extra = new [] {
-                        new ChatComponent
-                        {
-                            Text = "SCADrawGenerator",
-                            Color = "gold",
-                            Bold = "true",
-                            Extra = null
-                        }
-                    }
-                }
-            }
-        };
+        public int X { get; set; }
+        public int Y { get; set; }
     }
 
-    public static ChatComponent WithName(string name, int x, int y)
+    public class DrawColor
     {
-        return new ChatComponent
-        {
-            Text = name,
-            Extra = new []
-            {
-                new ChatComponent
-                {
-                    Text = $" [{x}, {y}]",
-                    Color = "gold"
-                }
-            }
-        };
+        public int Paper { get; set; } = -1; // White
+        public int Ink { get; set; } = -16777216; // Black
     }
 }
